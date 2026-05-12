@@ -19,7 +19,6 @@ from mcap.writer import CompressionType, Writer as McapRawWriter
 
 from osi_utilities.tracefile.mcap_channel import MCAPChannel
 from osi_utilities.tracefile.writers.multi import prepare_required_file_metadata
-from osi_utilities.timestamp import timestamp_to_nanoseconds
 
 if TYPE_CHECKING:
     from typing import IO
@@ -30,26 +29,41 @@ ZSTD_LEVEL = 19
 CHUNK_SIZE = 32 * 1024 * 1024  # 32 MiB
 
 
-def _patch_zstd_level() -> object:
+_zstd_patch_refcount = 0
+_zstd_original: object = None
+
+
+def _patch_zstd_level() -> None:
     """Monkey-patch mcap's zstd.compress to use level 19.
 
-    Returns the original compress function so it can be restored later.
+    Uses reference counting so multiple exporters share one patch safely.
     """
-    import zstandard
+    global _zstd_patch_refcount, _zstd_original
 
-    original = mcap_writer_module.zstandard.compress  # type: ignore[attr-defined]
-    compressor = zstandard.ZstdCompressor(level=ZSTD_LEVEL)
+    if _zstd_patch_refcount == 0:
+        import zstandard
 
-    def _compress_high(data: bytes) -> bytes:
-        return compressor.compress(data)
+        _zstd_original = mcap_writer_module.zstandard.compress  # type: ignore[attr-defined]
+        compressor = zstandard.ZstdCompressor(level=ZSTD_LEVEL)
 
-    mcap_writer_module.zstandard.compress = _compress_high  # type: ignore[attr-defined]
-    return original
+        def _compress_high(data: bytes) -> bytes:
+            return compressor.compress(data)
+
+        mcap_writer_module.zstandard.compress = _compress_high  # type: ignore[attr-defined]
+
+    _zstd_patch_refcount += 1
 
 
-def _restore_zstd(original: object) -> None:
-    """Restore the original zstd compress function."""
-    mcap_writer_module.zstandard.compress = original  # type: ignore[attr-defined]
+def _unpatch_zstd_level() -> None:
+    """Restore the original zstd compress function when last exporter closes."""
+    global _zstd_patch_refcount, _zstd_original
+
+    if _zstd_patch_refcount > 0:
+        _zstd_patch_refcount -= 1
+
+    if _zstd_patch_refcount == 0 and _zstd_original is not None:
+        mcap_writer_module.zstandard.compress = _zstd_original  # type: ignore[attr-defined]
+        _zstd_original = None
 
 
 class MCAPExporter:
@@ -77,13 +91,15 @@ class MCAPExporter:
         self._file: IO[bytes] | None = None
         self._writer: McapRawWriter | None = None
         self._osi_channel: MCAPChannel | None = None
-        self._original_zstd: object = None
         self._raw_channels: dict[str, int] = {}  # topic -> channel_id for ROS
         self._written_count = 0
 
     def open(self) -> None:
         """Open the MCAP file and initialize the writer."""
-        self._original_zstd = _patch_zstd_level()
+        if self._writer is not None:
+            raise RuntimeError("Exporter already open — call close() first")
+
+        _patch_zstd_level()
 
         self._file = open(self._output_path, "wb")  # noqa: SIM115
         self._writer = McapRawWriter(
@@ -144,15 +160,11 @@ class MCAPExporter:
         if topic in self._raw_channels:
             raise RuntimeError(f"Raw channel '{topic}' already registered")
 
-        schema_id = self._writer.register_schema(
-            name=ros_msg_type,
-            encoding="ros1msg",
-            data=b"",  # no schema data for raw pass-through
-        )
+        # Use schema_id=0 (no schema) for raw pass-through channels per MCAP spec
         channel_id = self._writer.register_channel(
             topic=f"raw/{topic}",
             message_encoding="ros1",
-            schema_id=schema_id,
+            schema_id=0,
         )
         self._raw_channels[topic] = channel_id
         return channel_id
@@ -168,6 +180,7 @@ class MCAPExporter:
             True on success.
         """
         if self._osi_channel is None:
+            logger.warning("Cannot write OSI message for '%s': exporter not open", topic)
             return False
         ok = self._osi_channel.write_message(message, topic)
         if ok:
@@ -190,7 +203,11 @@ class MCAPExporter:
         Returns:
             True on success.
         """
-        if self._writer is None or topic not in self._raw_channels:
+        if self._writer is None:
+            logger.warning("Cannot write raw message for '%s': exporter not open", topic)
+            return False
+        if topic not in self._raw_channels:
+            logger.warning("Cannot write raw message: channel '%s' not registered", topic)
             return False
         try:
             self._writer.add_message(
@@ -200,7 +217,7 @@ class MCAPExporter:
                 publish_time=timestamp_ns,
             )
             return True
-        except Exception as e:
+        except (ValueError, TypeError) as e:
             logger.error("Failed to write raw message for '%s': %s", topic, e)
             return False
 
@@ -221,9 +238,7 @@ class MCAPExporter:
                     pass
                 self._file = None
             self._raw_channels.clear()
-            if self._original_zstd is not None:
-                _restore_zstd(self._original_zstd)
-                self._original_zstd = None
+            _unpatch_zstd_level()
 
     def __enter__(self) -> MCAPExporter:
         self.open()
@@ -231,6 +246,16 @@ class MCAPExporter:
 
     def __exit__(self, *exc: object) -> None:
         self.close()
+
+    def __del__(self) -> None:
+        if self._writer is not None:
+            import warnings
+            warnings.warn(
+                f"MCAPExporter for {self._output_path} was not closed — "
+                "MCAP file may be corrupt (missing footer/index)",
+                ResourceWarning,
+                stacklevel=2,
+            )
 
     @property
     def include_raw(self) -> bool:

@@ -28,7 +28,7 @@ class Camera:
 
         camera.camera_sensor_view.add()
         camera.camera_sensor_view[0].image_data = msg.data
-        camera.camera_sensor_view[0].view_configuration.ChannelFormat.Name = 6
+        camera.camera_sensor_view[0].view_configuration.channel_format.append(6)
         camera.camera_sensor_view[0].view_configuration.number_of_pixels_vertical = self.number_of_pixels_vertical
         camera.camera_sensor_view[0].view_configuration.number_of_pixels_horizontal = self.number_of_pixels_horizontal
         camera.camera_sensor_view[0].view_configuration.mounting_position.position.x = self.position_x

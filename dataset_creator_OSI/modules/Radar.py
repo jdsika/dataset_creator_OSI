@@ -1,15 +1,7 @@
-import math as m
-
 import sensor_msgs.point_cloud2 as pc2
 from osi3.osi_sensordata_pb2 import SensorData
 
-
-def cart2sph(x, y, z):
-    XsqPlusYsq = x**2 + y**2
-    r = m.sqrt(XsqPlusYsq + z**2)
-    elev = m.atan2(z, m.sqrt(XsqPlusYsq))
-    az = m.atan2(y, x)
-    return r, elev, az
+from dataset_creator_OSI.utils.coords import cart2sph
 
 
 class Radar:

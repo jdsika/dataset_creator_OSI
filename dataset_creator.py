@@ -1,6 +1,7 @@
 import sys
 import os
 import re
+import io
 import argparse
 import yaml
 import logging
@@ -11,6 +12,7 @@ import importlib
 from tqdm.auto import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
 
+import osi3
 from osi3.osi_groundtruth_pb2 import GroundTruth
 
 from dataset_creator_OSI.exporter import MCAPExporter
@@ -44,13 +46,17 @@ def main():
 
     description = f"Converted from {os.path.basename(args.bag_location)}"
 
+    osi_version = str(osi3.__version__)
+    channel_meta = {"net.asam.osi.trace.channel.osi_version": osi_version}
+
     with MCAPExporter(output_path, include_raw=args.include_raw,
                       description=description) as exporter:
         # Register OSI channels for each sensor
         for sensor_name in config:
             topic = config[sensor_name]["topic"]
             sensor = sensor_classes[topic]
-            exporter.add_osi_channel(sensor_name, sensor.MESSAGE_TYPE)
+            exporter.add_osi_channel(sensor_name, sensor.MESSAGE_TYPE,
+                                     metadata=channel_meta)
 
         # Register raw ROS channels if requested
         if args.include_raw:
@@ -61,9 +67,11 @@ def main():
                     exporter.add_raw_channel(topic, topic_info[topic].msg_type)
 
         # Register and write target channel
-        target_msg = create_target(args.bag_location, args.targets)
+        target_msg = create_target(args.bag_location, args.targets,
+                                   bag.get_start_time())
         if target_msg is not None:
-            exporter.add_osi_channel("ground_truth_target", GroundTruth)
+            exporter.add_osi_channel("ground_truth_target", GroundTruth,
+                                     metadata=channel_meta)
             exporter.write_osi_message("ground_truth_target", target_msg)
 
         # Process bag messages
@@ -84,8 +92,13 @@ def parse_args():
     return parser.parse_args()
 
 
-def create_target(bag_location, path_to_target):
+def create_target(bag_location, path_to_target, bag_start_time):
     """Build a GroundTruth message for the static target based on bag path.
+
+    Args:
+        bag_location: Path to the rosbag file.
+        path_to_target: Path to targets YAML.
+        bag_start_time: Bag start time in seconds (from Bag.get_start_time()).
 
     Returns:
         A GroundTruth message, or None if no target matches.
@@ -113,7 +126,7 @@ def create_target(bag_location, path_to_target):
         target = targets[target_type]
         return build_static_target(
             target["width"], target["length"], target["height"],
-            x, y, 0, 0, yaw)
+            x, y, 0, 0, yaw, timestamp_s=bag_start_time)
     return None
 
 
@@ -183,7 +196,13 @@ def read_bag(bag, config, sensor_classes, exporter, logger):
 
             # Optionally write raw ROS message
             if exporter.include_raw:
-                raw_data = msg._buff if hasattr(msg, '_buff') else msg.serialize_numpy() if hasattr(msg, 'serialize_numpy') else b""
+                try:
+                    buf = io.BytesIO()
+                    msg.serialize(buf)
+                    raw_data = buf.getvalue()
+                except Exception:
+                    logger.warning("Could not serialize raw message for topic '%s'", topic)
+                    raw_data = b""
                 if raw_data:
                     timestamp_ns = int(t.to_nsec())
                     exporter.write_raw_message(topic, raw_data, timestamp_ns)
