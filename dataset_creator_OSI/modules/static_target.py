@@ -20,6 +20,12 @@ def build_static_target(width, length, height, x, y, roll, pitch, yaw,
     gt.timestamp.seconds = int(timestamp_s)
     gt.timestamp.nanos = int((timestamp_s % 1) * 1e9)
     gt.host_vehicle_id.value = host_vehicle_id
+
+    # host_vehicle_id must reference a moving_object entry (OSI spec)
+    ego = gt.moving_object.add()
+    ego.id.value = host_vehicle_id
+    ego.type = 2  # TYPE_VEHICLE
+
     obj = gt.stationary_object.add()
     obj.base.dimension.width = width
     obj.base.dimension.length = length

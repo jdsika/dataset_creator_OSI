@@ -89,11 +89,15 @@ class TestBuildStaticTarget:
     def test_host_vehicle_id_default(self):
         gt = build_static_target(1, 1, 1, 0, 0, 0, 0, 0, timestamp_s=0.0)
         assert gt.host_vehicle_id.value == 0
+        # Must reference an actual moving_object entry
+        assert len(gt.moving_object) == 1
+        assert gt.moving_object[0].id.value == 0
 
     def test_host_vehicle_id_custom(self):
         gt = build_static_target(1, 1, 1, 0, 0, 0, 0, 0, timestamp_s=0.0,
                                  host_vehicle_id=42)
         assert gt.host_vehicle_id.value == 42
+        assert gt.moving_object[0].id.value == 42
 
 
 # ---------------------------------------------------------------------------
