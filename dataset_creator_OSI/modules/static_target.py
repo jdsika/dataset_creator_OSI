@@ -10,8 +10,9 @@ def build_static_target(width, length, height, x, y, roll, pitch, yaw,
     Args:
         timestamp_s: Timestamp in seconds (e.g. from bag.get_start_time()).
             Mandatory per OSI spec (GroundTruth.timestamp is_set rule).
-        host_vehicle_id: Identifier for the host vehicle (required by
-            Lichtblick for FrameTransforms).
+        host_vehicle_id: Identifier for the host vehicle. A matching
+            moving_object entry is created so the reference is valid
+            (required by Lichtblick FrameTransforms).
 
     Returns:
         A populated GroundTruth protobuf message.
@@ -21,10 +22,11 @@ def build_static_target(width, length, height, x, y, roll, pitch, yaw,
     gt.timestamp.nanos = int((timestamp_s % 1) * 1e9)
     gt.host_vehicle_id.value = host_vehicle_id
 
-    # host_vehicle_id must reference a moving_object entry (OSI spec)
+    # host_vehicle_id must reference a moving_object entry (OSI spec).
+    # Only set the id — no type/dimensions since the ego vehicle properties
+    # are not available in the source data.
     ego = gt.moving_object.add()
     ego.id.value = host_vehicle_id
-    ego.type = 2  # TYPE_VEHICLE
 
     obj = gt.stationary_object.add()
     obj.base.dimension.width = width
