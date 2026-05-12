@@ -20,6 +20,17 @@ class Lidar:
     def export(self, msg):
         """Build and return a SensorData protobuf from a ROS PointCloud2 message."""
         sensor_data = SensorData()
+
+        # Top-level fields for Lichtblick FrameTransforms
+        sensor_data.timestamp.seconds = msg.header.stamp.secs
+        sensor_data.timestamp.nanos = msg.header.stamp.nsecs
+        sensor_data.mounting_position.position.x = self.position_x
+        sensor_data.mounting_position.position.y = self.position_y
+        sensor_data.mounting_position.position.z = self.position_z
+        sensor_data.mounting_position.orientation.roll = self.roll
+        sensor_data.mounting_position.orientation.pitch = self.pitch
+        sensor_data.mounting_position.orientation.yaw = self.yaw
+
         lidar_data = sensor_data.feature_data.lidar_sensor
         lidar_data.add()
         point_cloud_list = pc2.read_points_list(msg)

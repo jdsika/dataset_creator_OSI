@@ -86,6 +86,15 @@ class TestBuildStaticTarget:
         gt = build_static_target(1, 1, 1, 0, 0, 0, 0, 0, timestamp_s=0.0)
         assert len(gt.stationary_object) == 1
 
+    def test_host_vehicle_id_default(self):
+        gt = build_static_target(1, 1, 1, 0, 0, 0, 0, 0, timestamp_s=0.0)
+        assert gt.host_vehicle_id.value == 0
+
+    def test_host_vehicle_id_custom(self):
+        gt = build_static_target(1, 1, 1, 0, 0, 0, 0, 0, timestamp_s=0.0,
+                                 host_vehicle_id=42)
+        assert gt.host_vehicle_id.value == 42
+
 
 # ---------------------------------------------------------------------------
 # MCAPExporter
@@ -198,6 +207,9 @@ class TestCameraExport:
         result = camera.export(self._make_mock_msg(secs=42, nsecs=123))
         assert result.sensor_view[0].timestamp.seconds == 42
         assert result.sensor_view[0].timestamp.nanos == 123
+        # Top-level timestamp for MCAP log_time
+        assert result.timestamp.seconds == 42
+        assert result.timestamp.nanos == 123
 
     def test_image_data_preserved(self):
         camera = self._make_camera()
@@ -221,6 +233,10 @@ class TestCameraExport:
     def test_mounting_position(self):
         camera = self._make_camera()
         result = camera.export(self._make_mock_msg())
+        # Nested view config mounting position
         mp = result.sensor_view[0].camera_sensor_view[0].view_configuration.mounting_position
         assert mp.position.x == 1.0
         assert mp.position.z == 1.5
+        # Top-level SensorData mounting position (Lichtblick FrameTransforms)
+        assert result.mounting_position.position.x == 1.0
+        assert result.mounting_position.position.z == 1.5
