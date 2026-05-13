@@ -105,7 +105,11 @@ def create_target(bag_location, path_to_target):
     mask_angles = np.isin(angles, bag_name)
 
     if np.any(mask_target):
+        if not np.any(mask_distances):
+            return None
         distance = int(distances[mask_distances][0].split("m")[0])
+        if distance not in distances_RTK:
+            return None
         x, y = distances_RTK[distance]
         yaw = int(angles[mask_angles][0].split("deg")[0]
                   ) if angles[mask_angles].size > 0 else 0
