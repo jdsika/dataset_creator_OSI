@@ -179,6 +179,8 @@ def read_bag(bag, config, sensor_classes, exporter, logger):
     """Read bag messages and write to MCAP via the exporter."""
     topics = [config[i]["topic"] for i in config]
     topic_to_sensor_name = {config[k]["topic"]: k for k in config}
+    # Deterministic sensor IDs from config key order (1-based)
+    topic_to_sensor_id = {config[k]["topic"]: i + 1 for i, k in enumerate(config)}
 
     logger.info("Reading Messages")
     with logging_redirect_tqdm([logger]):
@@ -192,6 +194,7 @@ def read_bag(bag, config, sensor_classes, exporter, logger):
 
             # Convert ROS message to OSI protobuf
             osi_msg = sensor.export(msg)
+            osi_msg.sensor_id.value = topic_to_sensor_id[topic]
             exporter.write_osi_message(sensor_name, osi_msg)
 
             # Optionally write raw ROS message
