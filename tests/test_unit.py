@@ -220,12 +220,12 @@ class TestCameraExport:
         result = camera.export(self._make_mock_msg())
         assert result.sensor_view[0].camera_sensor_view[0].image_data == b"\xff\xd8fake_jpeg_data"
 
-    def test_channel_format_is_rgb_u8(self):
+    def test_channel_format_is_other(self):
         camera = self._make_camera()
         result = camera.export(self._make_mock_msg())
         fmt = result.sensor_view[0].camera_sensor_view[0].view_configuration.channel_format
         assert len(fmt) == 1
-        assert fmt[0] == 6  # CHANNEL_FORMAT_RGB_U8_LIN
+        assert fmt[0] == 1  # CHANNEL_FORMAT_OTHER (compressed ROS image)
 
     def test_resolution_set(self):
         camera = self._make_camera()

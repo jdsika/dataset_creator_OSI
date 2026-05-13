@@ -184,10 +184,9 @@ def read_bag(bag, config, sensor_classes, exporter, logger):
 
     logger.info("Reading Messages")
     with logging_redirect_tqdm([logger]):
-        for topic, msg, t in tqdm(bag.read_messages(), total=bag.get_message_count(), desc=bag._file.name):
-            if topic not in topics:
-                logger.info(f"Message {topic} ignored")
-                continue
+        for topic, msg, t in tqdm(bag.read_messages(topics=topics),
+                                   total=bag.get_message_count(topic_filters=topics),
+                                   desc=bag._file.name):
 
             sensor_name = topic_to_sensor_name[topic]
             sensor = sensor_classes[topic]

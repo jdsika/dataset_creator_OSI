@@ -85,10 +85,14 @@ class MockBag:
         self._messages = messages  # list of (topic, msg, time)
         self._file = types.SimpleNamespace(name=name)
 
-    def read_messages(self):
+    def read_messages(self, topics=None):
+        if topics is not None:
+            return iter([(t, m, ts) for t, m, ts in self._messages if t in topics])
         return iter(self._messages)
 
-    def get_message_count(self):
+    def get_message_count(self, topic_filters=None):
+        if topic_filters is not None:
+            return sum(1 for t, _, _ in self._messages if t in topic_filters)
         return len(self._messages)
 
     def get_start_time(self):

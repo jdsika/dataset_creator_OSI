@@ -54,6 +54,9 @@ class Lidar:
                 lidar_data[0].detection[ind].reflectivity = point.reflectivity
             except AttributeError:
                 lidar_data[0].detection[ind].reflectivity = 0
-            lidar_data[0].detection[ind].intensity = point.intensity
+            try:
+                lidar_data[0].detection[ind].intensity = point.intensity
+            except AttributeError:
+                lidar_data[0].detection[ind].intensity = 0
 
         return sensor_data
