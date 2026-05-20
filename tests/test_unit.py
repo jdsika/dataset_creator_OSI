@@ -70,6 +70,8 @@ class TestBuildStaticTarget:
         assert obj.base.dimension.height == 1.5
         assert obj.base.position.x == 10.0
         assert obj.base.position.y == 20.0
+        # z = height/2 for bounding-box center of ground-resting object
+        assert obj.base.position.z == pytest.approx(0.75)
         assert obj.base.orientation.yaw == 0.5
 
     def test_integer_timestamp(self):

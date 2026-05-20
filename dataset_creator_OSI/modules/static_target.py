@@ -54,7 +54,9 @@ def build_static_target(width, length, height, x, y, roll, pitch, yaw,
     obj.base.dimension.height = height
     obj.base.position.x = x
     obj.base.position.y = y
-    obj.base.position.z = 0.0
+    # BaseStationary.position is the bounding-box center (OSI spec).
+    # For ground-resting objects, z = height / 2.
+    obj.base.position.z = height / 2.0
     obj.base.orientation.roll = roll
     obj.base.orientation.pitch = pitch
     obj.base.orientation.yaw = yaw

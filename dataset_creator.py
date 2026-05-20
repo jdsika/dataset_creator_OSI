@@ -2,6 +2,7 @@ import sys
 import os
 import re
 import io
+import math
 import argparse
 import yaml
 import logging
@@ -122,11 +123,12 @@ def create_target(bag_location, path_to_target, bag_start_time):
         x, y = distances_RTK[distance]
         yaw = int(angles[mask_angles][0].split("deg")[0]
                   ) if angles[mask_angles].size > 0 else 0
+        yaw_rad = math.radians(yaw)
         target_type = np.array(bag_name)[mask_target][0]
         target = targets[target_type]
         return build_static_target(
             target["width"], target["length"], target["height"],
-            x, y, 0, 0, yaw, timestamp_s=bag_start_time)
+            x, y, 0, 0, yaw_rad, timestamp_s=bag_start_time)
     return None
 
 
