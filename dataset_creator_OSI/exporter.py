@@ -163,7 +163,7 @@ class MCAPExporter:
         # Use schema_id=0 (no schema) for raw pass-through channels per MCAP spec
         channel_id = self._writer.register_channel(
             topic=f"raw/{topic}",
-            message_encoding="ros1",
+            message_encoding="ros1msg",
             schema_id=0,
         )
         self._raw_channels[topic] = channel_id
